@@ -35,15 +35,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, username: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: { username },
-      },
-    });
-    return { error: error as Error | null };
+    try {
+      // First, create the user account
+      const { error: signUpError, data } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/email-verification`,
+          data: { username },
+        },
+      });
+
+      if (signUpError) {
+        return { error: signUpError as Error };
+      }
+
+      // In development or if email confirmation fails, auto-login
+      if (import.meta.env.DEV || data?.user?.email_confirmed_at === null) {
+        // Try to sign in immediately
+        const { error: signInError } = await supabase.auth.signInWithPassword({ 
+          email, 
+          password 
+        });
+        
+        if (signInError) {
+          console.warn("Auto-login failed, waiting for email verification:", signInError);
+        }
+      }
+
+      return { error: null };
+    } catch (err) {
+      console.error("Signup error:", err);
+      return { error: err as Error };
+    }
   };
 
   const signIn = async (email: string, password: string) => {

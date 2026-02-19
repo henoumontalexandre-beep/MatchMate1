@@ -21,7 +21,6 @@ const Setup = () => {
 
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
 
   // Form state - Profile
   const [username, setUsername] = useState("");
@@ -77,14 +76,36 @@ const Setup = () => {
         return;
       }
 
+      // Save profile data to localStorage before signup
+      const profileData = {
+        username,
+        avatar_emoji: avatar,
+        games,
+        level: level as string,
+        play_style: playStyle as string,
+        availability,
+        bio,
+        main_game: mainGame || games[0] || "",
+        discord_tag: discordTag,
+        game_username: gameUsername,
+        phone_number: phoneNumber,
+        steam_epic_link: steamEpicLink,
+      };
+      localStorage.setItem("pendingProfileData", JSON.stringify(profileData));
+      localStorage.setItem("pendingEmail", email);
+
       setSaving(true);
       const { error } = await signUp(email, password, username);
       setSaving(false);
 
       if (error) {
         toast({ title: "Erreur", description: error.message, variant: "destructive" });
+        // Clear pending data if signup failed
+        localStorage.removeItem("pendingProfileData");
+        localStorage.removeItem("pendingEmail");
       } else {
-        setEmailSent(true);
+        // Redirect to email verification page
+        navigate("/email-verification");
       }
       return;
     }
@@ -129,26 +150,6 @@ const Setup = () => {
 
   // L'ordre des étapes : profil d'abord (étapes 0-6), puis email/password (étapes 7-8) uniquement si pas authentifié
   const totalSteps = user ? 7 : 9;
-
-  if (emailSent) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="max-w-md w-full text-center">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-6">
-            <Check className="w-8 h-8 text-primary" />
-          </div>
-          <h1 className="text-2xl font-display font-bold text-foreground mb-2">Vérifie ton email</h1>
-          <p className="text-muted-foreground mb-6">
-            Un lien de confirmation a été envoyé à <span className="text-foreground font-medium">{email}</span>. 
-            Clique dessus pour activer ton compte.
-          </p>
-          <Button variant="outline" onClick={() => navigate("/")}>
-            Retour à l'accueil
-          </Button>
-        </motion.div>
-      </div>
-    );
-  }
 
   if (loading) {
     return (
