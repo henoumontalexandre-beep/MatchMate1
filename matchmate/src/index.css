@@ -1,0 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 200 50% 5%;
+    --foreground: 210 30% 95%;
+
+    --card: 200 40% 10%;
+    --card-foreground: 210 30% 95%;
+
+    --popover: 200 40% 10%;
+    --popover-foreground: 210 30% 95%;
+
+    --primary: 190 100% 42%;
+    --primary-foreground: 200 35% 6%;
+
+    --secondary: 200 50% 15%;
+    --secondary-foreground: 210 30% 95%;
+
+    --muted: 200 20% 20%;
+    --muted-foreground: 210 20% 60%;
+
+    --accent: 180 100% 51%;
+    --accent-foreground: 200 50% 5%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 200 30% 18%;
+    --input: 200 30% 15%;
+    --ring: 190 100% 42%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 200 40% 8%;
+    --sidebar-foreground: 210 20% 60%;
+    --sidebar-primary: 190 100% 42%;
+    --sidebar-primary-foreground: 200 35% 6%;
+    --sidebar-accent: 200 30% 20%;
+    --sidebar-accent-foreground: 210 30% 95%;
+    --sidebar-border: 200 30% 18%;
+    --sidebar-ring: 180 100% 51%;
+
+    /* Custom tokens */
+    --glow-primary: 190 100% 42%;
+    --glow-secondary: 200 50% 15%;
+    --glow-accent: 180 100% 51%;
+    --gradient-gaming: linear-gradient(135deg, hsl(190 100% 42%) , hsl(190 100% 32%));
+    --gradient-match: linear-gradient(135deg, hsl(200 50% 15%), hsl(190 100% 42%));
+    --shadow-glow: 0 0 28px -6px hsl(190 100% 42% / 0.48);
+    --shadow-glow-strong: 0 0 46px -6px hsl(190 100% 42% / 0.7);
+    --shadow-secondary-glow: 0 0 26px -6px hsl(190 100% 42% / 0.36);
+
+    --font-display: 'Orbitron', sans-serif;
+    --font-body: 'Inter', sans-serif;
+
+    /* Match score colors */
+    --score-high: 190 100% 42%;
+    --score-medium: 45 100% 55%;
+    --score-low: 0 80% 55%;
+  }
+}
+
+/* Global typographic scale reduction for a sleeker UI.
+   Keeps mobile readable by restoring 100% at small widths. */
+html {
+  /* Reduce more: 16px -> 13px (81.25%) for a sleeker, more compact UI */
+  font-size: 81.25%;
+}
+
+@media (max-width: 640px) {
+  /* Keep mobile at default for readability */
+  html { font-size: 100%; }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer utilities {
+  .text-gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-match {
+    background: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--primary)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-gradient-gaming {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--accent) / 0.15));
+  }
+
+  .bg-gradient-card {
+    background: linear-gradient(145deg, hsl(var(--card)), hsl(230 25% 12%));
+  }
+
+  .border-glow {
+    border-color: hsl(var(--primary) / 0.3);
+  }
+
+  .border-glow-secondary {
+    border-color: hsl(var(--secondary) / 0.3);
+  }
+
+  .glow-box {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .glow-box-strong {
+    box-shadow: var(--shadow-glow-strong);
+  }
+
+  .glow-box-secondary {
+    box-shadow: var(--shadow-secondary-glow);
+  }
+
+  .card-gaming {
+    @apply bg-gradient-card border border-glow rounded-xl;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 20px -5px hsl(190 100% 50% / 0.3);
+    }
+    50% {
+      box-shadow: 0 0 40px -5px hsl(190 100% 50% / 0.6);
+    }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+}
