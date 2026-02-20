@@ -9,22 +9,30 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Gamepad2, LogOut, Search, Users, Clock, Zap, Target, Sparkles,
+  Gamepad2, LogOut, Search, Users, Clock, Zap, Target,
   UserCircle, Settings, X, MessageSquare, Globe, Phone, Link2, ChevronRight
 } from "lucide-react";
+import { GAMES, STYLES, AVAILABILITIES } from "@/lib/matchmaking";
+const AVATARS = ["🎮", "⚔️", "🐺", "🔥", "✨", "🌙", "🎯", "💎", "🦊", "🐉", "👾", "🤖"];
 
 const Dashboard = () => {
   const { user, signOut } = useAuth();
-  const { profile, loading: profileLoading, setOnlineStatus } = useProfile();
+  const { profile, loading: profileLoading, setOnlineStatus, updateProfile } = useProfile();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [tab, setTab] = useState<"find" | "matches" | "profile" | "duo">("find");
+  const [tab, setTab] = useState<"find" | "matches" | "profile">("find");
   const [players, setPlayers] = useState<Profile[]>([]);
   const [matches, setMatches] = useState<Array<{ requester_id: string; matched_id: string; compatibility_score: number; match_mode: string; status: string; created_at?: string; otherProfile?: Profile }>>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<Profile | null>(null);
   const [matchMode, setMatchMode] = useState<"compétitif" | "chill" | "normal">("normal");
   const [loadingPlayers, setLoadingPlayers] = useState(false);
+  const [showSorter, setShowSorter] = useState(false);
+  const [sorterSection, setSorterSection] = useState<"games" | "style" | "availability">("games");
+  const [selectedGames, setSelectedGames] = useState<string[]>([]);
+  const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  const [selectedAvailabilities, setSelectedAvailabilities] = useState<string[]>([]);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
 
   // Set online on mount
   useEffect(() => {
@@ -95,10 +103,21 @@ const Dashboard = () => {
       filtered = filtered.filter(p => p.play_style === "chill" || p.play_style === "fun");
     }
 
+    // Apply selected "Trier par" filters (within each category: OR, across categories: AND)
+    if (selectedGames.length > 0) {
+      filtered = filtered.filter(p => p.games.some(g => selectedGames.includes(g)));
+    }
+    if (selectedStyles.length > 0) {
+      filtered = filtered.filter(p => selectedStyles.includes(p.play_style));
+    }
+    if (selectedAvailabilities.length > 0) {
+      filtered = filtered.filter(p => p.availability.some(a => selectedAvailabilities.includes(a)));
+    }
+
     return filtered
       .map(p => ({ player: p, score: calculateCompatibility(profile, p) }))
       .sort((a, b) => b.score - a.score);
-  }, [profile, players, matchMode]);
+  }, [profile, players, matchMode, selectedGames, selectedStyles, selectedAvailabilities]);
 
   const sendMatchRequest = async (targetUserId: string) => {
     if (!user || !profile) return;
@@ -178,7 +197,6 @@ const Dashboard = () => {
         <div className="max-w-7xl mx-auto px-6 flex overflow-x-auto">
           {[
             { key: "find" as const, label: "Découvrir", icon: <Search className="w-4 h-4" /> },
-            { key: "duo" as const, label: "Trouve ton duo", icon: <Sparkles className="w-4 h-4" /> },
             { key: "matches" as const, label: "Mes matchs", icon: <MessageSquare className="w-4 h-4" /> },
             { key: "profile" as const, label: "Mon profil", icon: <UserCircle className="w-4 h-4" /> },
           ].map(t => (
@@ -195,6 +213,8 @@ const Dashboard = () => {
               {t.label}
             </button>
           ))}
+
+          <div className="flex-1" />
         </div>
       </div>
 
@@ -202,10 +222,68 @@ const Dashboard = () => {
         {/* FIND TAB */}
         {tab === "find" && (
           <div>
-            {/* Mode selector */}
-            <div className="mb-8">
-              <h2 className="text-2xl font-display font-bold text-foreground mb-4">Découvre tes matchs</h2>
-              <div className="flex gap-3 flex-wrap">
+                {/* Mode selector */}
+                <div className="mb-8">
+                  <div className="flex items-start justify-between">
+                    <h2 className="text-2xl font-display font-bold text-foreground mb-4">Découvre tes matchs</h2>
+
+                    <div className="relative">
+                      <Button onClick={() => setShowSorter(s => !s)} variant="outline" className="ml-4 mt-1">
+                        Trier par
+                      </Button>
+                      {showSorter && (
+                        <div className="absolute right-0 mt-2 w-72 bg-card border border-primary/10 rounded-lg p-3 shadow-lg z-40">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex gap-2">
+                              <button onClick={() => setSorterSection("games")} className={`px-3 py-1 rounded-md text-sm ${sorterSection==="games"?"bg-primary/20 text-primary":"text-muted-foreground"}`}>Jeux</button>
+                              <button onClick={() => setSorterSection("style")} className={`px-3 py-1 rounded-md text-sm ${sorterSection==="style"?"bg-primary/20 text-primary":"text-muted-foreground"}`}>Style</button>
+                              <button onClick={() => setSorterSection("availability")} className={`px-3 py-1 rounded-md text-sm ${sorterSection==="availability"?"bg-primary/20 text-primary":"text-muted-foreground"}`}>Horaire</button>
+                            </div>
+                            <div className="text-xs text-muted-foreground">Sélectionnez plusieurs</div>
+                          </div>
+
+                          {/* Section content */}
+                          <div className="max-h-48 overflow-auto">
+                            {sorterSection === "games" && (
+                              <div className="grid grid-cols-2 gap-2">
+                                {GAMES.map(g => (
+                                  <button key={g} onClick={() => setSelectedGames(s => s.includes(g) ? s.filter(x => x!==g) : [...s, g])} className={`text-sm px-3 py-2 rounded-lg border ${selectedGames.includes(g)?"bg-primary/20 border-primary text-primary":"bg-card/60 border-primary/20 text-muted-foreground"}`}>
+                                    {g}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            {sorterSection === "style" && (
+                              <div className="flex gap-2 flex-wrap">
+                                {STYLES.map(s => (
+                                  <button key={s} onClick={() => setSelectedStyles(v => v.includes(s) ? v.filter(x=>x!==s) : [...v, s])} className={`text-sm px-3 py-2 rounded-full border ${selectedStyles.includes(s)?"bg-primary/20 border-primary text-primary":"bg-card/60 border-primary/20 text-muted-foreground"}`}>
+                                    {s}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            {sorterSection === "availability" && (
+                              <div className="grid grid-cols-1 gap-2">
+                                {AVAILABILITIES.map(a => (
+                                  <button key={a} onClick={() => setSelectedAvailabilities(v => v.includes(a) ? v.filter(x=>x!==a) : [...v, a])} className={`text-sm px-3 py-2 rounded-lg border ${selectedAvailabilities.includes(a)?"bg-primary/20 border-primary text-primary":"bg-card/60 border-primary/20 text-muted-foreground"}`}>
+                                    {a}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between mt-3">
+                            <button onClick={() => { setSelectedGames([]); setSelectedStyles([]); setSelectedAvailabilities([]); }} className="text-xs text-muted-foreground">Réinitialiser</button>
+                            <button onClick={() => setShowSorter(false)} className="text-xs bg-primary px-3 py-1 rounded text-primary-foreground">Appliquer</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-3 flex-wrap">
                 {[
                   { key: "normal" as const, label: "Tous", desc: "Tous les joueurs" },
                   { key: "compétitif" as const, label: "Compétitif", desc: "Ranked & Tryhard" },
@@ -348,79 +426,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {/* DUO TAB - AI Matching (minimal, frontend only) */}
-        {tab === "duo" && (
-          <div className="space-y-10">
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45 }}
-              className="rounded-2xl border border-primary/20 bg-card/30 p-8 md:p-12 backdrop-blur-sm"
-            >
-              <div className="grid lg:grid-cols-2 gap-8 items-center">
-                {/* Minimal AI visualization */}
-                <div className="flex items-center justify-center">
-                  <div className="relative w-64 h-64 flex items-center justify-center">
-                    <div className="absolute inset-0 rounded-full bg-primary/6" />
-                    <div className="absolute w-36 h-36 rounded-full bg-primary/12 flex items-center justify-center text-4xl font-bold text-primary">AI</div>
-                    <svg className="absolute w-full h-full" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <circle cx="100" cy="100" r="70" stroke="hsl(var(--primary) / 0.12)" strokeWidth="2" />
-                      <g stroke="hsl(var(--primary))" strokeWidth="1.5" opacity="0.9">
-                        <path d="M40 100 C70 60, 130 60, 160 100" strokeOpacity="0.6" />
-                        <path d="M60 120 C85 140, 115 140, 140 120" strokeOpacity="0.4" />
-                      </g>
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Text & CTA */}
-                <div className="space-y-6">
-                  <div>
-                    <h2 className="text-3xl font-display font-bold text-foreground mb-2">Trouve ton duo</h2>
-                    <p className="text-sm text-muted-foreground">L'IA analysera ton profil et proposera un duo compatible. Design minimal — backend à connecter plus tard.</p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold">1</div>
-                      <div>
-                        <div className="font-medium text-foreground">Analyse de profil</div>
-                        <div className="text-xs text-muted-foreground">Jeux, style, disponibilités</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-semibold">2</div>
-                      <div>
-                        <div className="font-medium text-foreground">Matching intelligent</div>
-                        <div className="text-xs text-muted-foreground">Scores de compatibilité basés sur ton profil</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <Button className="h-12 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg shadow-primary/20">Lancer l'analyse</Button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Placeholder summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-card/40 border border-primary/10 rounded-xl p-5 text-center">
-                <div className="text-2xl font-bold text-primary">—</div>
-                <div className="text-xs text-muted-foreground mt-2">Meilleur match (sera affiché ici)</div>
-              </div>
-              <div className="bg-card/40 border border-primary/10 rounded-xl p-5 text-center">
-                <div className="text-2xl font-bold text-primary">—</div>
-                <div className="text-xs text-muted-foreground mt-2">Score de compatibilité</div>
-              </div>
-              <div className="bg-card/40 border border-primary/10 rounded-xl p-5 text-center">
-                <div className="text-2xl font-bold text-primary">—</div>
-                <div className="text-xs text-muted-foreground mt-2">Actions</div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* DUO tab removed - replaced by 'Trier par' filter in Découvrir */}
 
         {/* PROFILE TAB */}
         {tab === "profile" && profile && (
@@ -436,6 +442,24 @@ const Dashboard = () => {
                   <p className="text-primary font-medium mt-1 capitalize">{profile.level} • {profile.play_style}</p>
                   <p className="text-sm text-muted-foreground mt-2">Membre depuis {new Date(profile.created_at || Date.now()).toLocaleDateString()}</p>
                 </div>
+              </div>
+              <div className="mb-6">
+                <button onClick={() => setShowAvatarPicker(s => !s)} className="text-sm border px-3 py-2 rounded-md bg-card/60 hover:bg-card">
+                  {showAvatarPicker ? "Fermer" : "Changer d'avatar"}
+                </button>
+                {showAvatarPicker && (
+                  <div className="mt-4 grid grid-cols-6 gap-3">
+                    {AVATARS.map(a => (
+                      <button key={a} onClick={async () => {
+                        await updateProfile({ avatar_emoji: a });
+                        setShowAvatarPicker(false);
+                        toast({ title: "Avatar mis à jour" });
+                      }} className={`h-14 rounded-xl text-2xl transition-all duration-200 border-2 flex items-center justify-center ${profile.avatar_emoji === a ? "border-primary bg-primary/20 shadow-lg scale-105" : "border-primary/20 bg-card/60 hover:bg-card"}`}>
+                        {a}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               
               {profile.bio && (

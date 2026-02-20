@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
-import { GAMES, LEVELS, STYLES, AVAILABILITIES } from "@/lib/matchmaking";
+import { GAMES, STYLES, AVAILABILITIES } from "@/lib/matchmaking";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,8 +10,6 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Gamepad2, ChevronRight, ChevronLeft, Check, Globe, Phone, Link2, Mail, Lock } from "lucide-react";
-
-const AVATARS = ["🎮", "⚔️", "🐺", "🔥", "✨", "🌙", "🎯", "💎", "🦊", "🐉", "👾", "🤖"];
 
 const Setup = () => {
   const { user, signUp } = useAuth();
@@ -26,7 +24,7 @@ const Setup = () => {
   const [username, setUsername] = useState("");
   const [avatar, setAvatar] = useState("🎮");
   const [games, setGames] = useState<string[]>([]);
-  const [level, setLevel] = useState("");
+  const [level, setLevel] = useState("intermédiaire");
   const [playStyle, setPlayStyle] = useState("");
   const [availability, setAvailability] = useState<string[]>([]);
   const [bio, setBio] = useState("");
@@ -47,7 +45,7 @@ const Setup = () => {
       setUsername(profile.username || "");
       setAvatar(profile.avatar_emoji || "🎮");
       setGames(profile.games || []);
-      setLevel(profile.level || "");
+      setLevel(profile.level || "intermédiaire");
       setPlayStyle(profile.play_style || "");
       setAvailability(profile.availability || []);
       setBio(profile.bio || "");
@@ -72,27 +70,9 @@ const Setup = () => {
       }
 
       if (password.length < 6) {
-        toast({ title: "Erreur", description: "Le mot de passe doit contenir au moins 6 caractères", variant: "destructive" });
+        toast({ title: "Erreur", description: "Le mot de passe doit contenir au least 6 caractères", variant: "destructive" });
         return;
       }
-
-      // Save profile data to localStorage before signup
-      const profileData = {
-        username,
-        avatar_emoji: avatar,
-        games,
-        level: level as string,
-        play_style: playStyle as string,
-        availability,
-        bio,
-        main_game: mainGame || games[0] || "",
-        discord_tag: discordTag,
-        game_username: gameUsername,
-        phone_number: phoneNumber,
-        steam_epic_link: steamEpicLink,
-      };
-      localStorage.setItem("pendingProfileData", JSON.stringify(profileData));
-      localStorage.setItem("pendingEmail", email);
 
       setSaving(true);
       const { error } = await signUp(email, password, username);
@@ -100,12 +80,33 @@ const Setup = () => {
 
       if (error) {
         toast({ title: "Erreur", description: error.message, variant: "destructive" });
-        // Clear pending data if signup failed
-        localStorage.removeItem("pendingProfileData");
-        localStorage.removeItem("pendingEmail");
       } else {
-        // Redirect to email verification page
-        navigate("/email-verification");
+        // Save profile immediately since user is now logged in
+        const profileData = {
+          username,
+          avatar_emoji: avatar,
+          games,
+          level: level as string,
+          play_style: playStyle as string,
+          availability,
+          bio,
+          main_game: mainGame || games[0] || "",
+          discord_tag: discordTag,
+          game_username: gameUsername,
+          phone_number: phoneNumber,
+          steam_epic_link: steamEpicLink,
+        };
+        
+        setSaving(true);
+        const { error: profileError } = await updateProfile(profileData);
+        setSaving(false);
+        
+        if (profileError) {
+          toast({ title: "Erreur", description: profileError.message, variant: "destructive" });
+        } else {
+          toast({ title: "Compte créé avec succès ✓" });
+          navigate("/dashboard");
+        }
       }
       return;
     }
@@ -139,7 +140,6 @@ const Setup = () => {
   const canProceed = [
     username.length >= 2,
     games.length >= 1,
-    level.length > 0,
     playStyle.length > 0,
     availability.length >= 1,
     true,
@@ -149,7 +149,7 @@ const Setup = () => {
   ][step];
 
   // L'ordre des étapes : profil d'abord (étapes 0-6), puis email/password (étapes 7-8) uniquement si pas authentifié
-  const totalSteps = user ? 7 : 9;
+  const totalSteps = user ? 6 : 8;
 
   if (loading) {
     return (
@@ -164,7 +164,10 @@ const Setup = () => {
       {/* Header */}
       <nav className="flex items-center justify-between px-8 py-6 border-b border-primary/10 bg-card/30 backdrop-blur-sm">
         <span className="font-display font-bold text-lg text-foreground">MatchMate</span>
-        <div className="text-sm text-muted-foreground font-medium">Étape {step + 1}/{totalSteps}</div>
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-muted-foreground font-medium">Étape {step + 1}/{totalSteps}</div>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/auth')} className="text-primary hover:bg-primary/5">Se connecter</Button>
+        </div>
       </nav>
 
       <div className="flex-1 flex items-center justify-center px-4 py-12">
@@ -190,7 +193,7 @@ const Setup = () => {
                   <h2 className="text-3xl font-display font-bold text-foreground mb-2">Ton identité</h2>
                   <p className="text-muted-foreground">Commence par te présenter</p>
                 </div>
-                
+
                 <div>
                   <Label className="text-foreground text-sm font-medium mb-3 block">Pseudo</Label>
                   <Input 
@@ -201,25 +204,6 @@ const Setup = () => {
                     maxLength={20} 
                   />
                   <p className="text-xs text-muted-foreground mt-2">{username.length}/20 caractères</p>
-                </div>
-
-                <div>
-                  <Label className="text-foreground text-sm font-medium mb-3 block">Avatar</Label>
-                  <div className="grid grid-cols-6 gap-3">
-                    {AVATARS.map(a => (
-                      <button 
-                        key={a} 
-                        onClick={() => setAvatar(a)}
-                        className={`h-14 rounded-xl text-2xl transition-all duration-300 border-2 flex items-center justify-center ${
-                          avatar === a 
-                            ? "border-primary bg-primary/20 shadow-lg shadow-primary/20 scale-105" 
-                            : "border-primary/20 bg-card/60 hover:bg-card hover:border-primary/40"
-                        }`}
-                      >
-                        {a}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             )}
@@ -248,31 +232,9 @@ const Setup = () => {
               </div>
             )}
 
-            {step === 2 && (
-              <div className="space-y-8">
-                <div>
-                  <h2 className="text-3xl font-display font-bold text-foreground mb-2">Ton niveau</h2>
-                  <p className="text-muted-foreground">Sois honnête</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  {LEVELS.map(l => (
-                    <button 
-                      key={l} 
-                      onClick={() => setLevel(l)}
-                      className={`px-6 py-4 rounded-xl text-sm font-medium capitalize transition-all duration-300 border-2 ${
-                        level === l 
-                          ? "bg-primary/20 border-primary text-primary shadow-lg shadow-primary/20" 
-                          : "bg-card/60 border-primary/20 text-muted-foreground hover:border-primary/40"
-                      }`}
-                    >
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Niveau step removed - default level is set to "intermédiaire" */}
 
-            {step === 3 && (
+            {step === 2 && (
               <div className="space-y-8">
                 <div>
                   <h2 className="text-3xl font-display font-bold text-foreground mb-2">Ton style</h2>
@@ -296,7 +258,7 @@ const Setup = () => {
               </div>
             )}
 
-            {step === 4 && (
+            {step === 3 && (
               <div className="space-y-8">
                 <div>
                   <h2 className="text-3xl font-display font-bold text-foreground mb-2">Tes disponibilités</h2>
@@ -320,7 +282,7 @@ const Setup = () => {
               </div>
             )}
 
-            {step === 5 && (
+            {step === 4 && (
               <div className="space-y-8">
                 <div>
                   <h2 className="text-3xl font-display font-bold text-foreground mb-2">Parle de toi</h2>
@@ -341,7 +303,7 @@ const Setup = () => {
               </div>
             )}
 
-            {step === 6 && (
+            {step === 5 && (
               <div className="space-y-8">
                 <div>
                   <h2 className="text-3xl font-display font-bold text-foreground mb-2">Infos de contact</h2>
@@ -396,7 +358,7 @@ const Setup = () => {
               </div>
             )}
 
-            {step === 7 && (
+            {step === 6 && (
               <div className="space-y-8">
                 <div>
                   <h2 className="text-3xl font-display font-bold text-foreground mb-2">Valide ton email</h2>
@@ -418,7 +380,7 @@ const Setup = () => {
               </div>
             )}
 
-            {step === 8 && (
+            {step === 7 && (
               <div className="space-y-8">
                 <div>
                   <h2 className="text-3xl font-display font-bold text-foreground mb-2">Sécurise ton compte</h2>

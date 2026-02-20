@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { useProfile } from "@/hooks/useProfile";
+import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Check, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,18 @@ const EmailVerification = () => {
   useEffect(() => {
     const verifyAndSave = async () => {
       try {
-        // Wait for user to be authenticated
+        // Try to process Supabase session from the URL (this handles the redirect flow)
+        try {
+          const { data: urlData, error: urlErr } = await supabase.auth.getSessionFromUrl();
+          if (urlErr) console.warn("getSessionFromUrl warning:", urlErr.message || urlErr);
+          if (urlData?.session) {
+            console.log("🔁 Session processed from URL");
+          }
+        } catch (e) {
+          console.warn("getSessionFromUrl failed:", e);
+        }
+
+        // Wait for user to be authenticated via context or use session from URL
         let attempts = 0;
         const maxAttempts = 40; // 40 * 500ms = 20 seconds max wait
 
@@ -40,11 +52,15 @@ const EmailVerification = () => {
           attempts++;
         }
 
-        if (!user) {
+        // If still no user, try to read session directly from Supabase client as a fallback
+        const clientSession = user ? null : (await supabase.auth.getSession()).data.session;
+        const sessionUser = user ?? clientSession?.user;
+
+        if (!sessionUser) {
           throw new Error("Authentification échouée. Veuillez vérifier vos identifiants et réessayer.");
         }
 
-        console.log("✅ User authenticated:", user.email);
+        console.log("✅ User authenticated:", sessionUser.email);
 
         // Get pending profile data from localStorage
         const pendingDataStr = localStorage.getItem("pendingProfileData");
@@ -57,21 +73,25 @@ const EmailVerification = () => {
 
         console.log("💾 Saving profile data...");
 
-        // Save profile data to database
-        const { error: profileError } = await updateProfile({
-          username: pendingData.username,
-          avatar_emoji: pendingData.avatar_emoji,
-          games: pendingData.games,
-          level: pendingData.level as "débutant" | "intermédiaire" | "avancé" | "expert",
-          play_style: pendingData.play_style as "compétitif" | "chill" | "tryhard" | "fun",
-          availability: pendingData.availability,
-          bio: pendingData.bio,
-          main_game: pendingData.main_game,
-          discord_tag: pendingData.discord_tag,
-          game_username: pendingData.game_username,
-          phone_number: pendingData.phone_number,
-          steam_epic_link: pendingData.steam_epic_link,
-        });
+        // Save profile data to database. Use upsert with user_id from session
+        const userId = sessionUser.id;
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .upsert({
+            user_id: userId,
+            username: pendingData.username,
+            avatar_emoji: pendingData.avatar_emoji,
+            games: pendingData.games,
+            level: pendingData.level as "débutant" | "intermédiaire" | "avancé" | "expert",
+            play_style: pendingData.play_style as "compétitif" | "chill" | "tryhard" | "fun",
+            availability: pendingData.availability,
+            bio: pendingData.bio,
+            main_game: pendingData.main_game,
+            discord_tag: pendingData.discord_tag,
+            game_username: pendingData.game_username,
+            phone_number: pendingData.phone_number,
+            steam_epic_link: pendingData.steam_epic_link,
+          }, { onConflict: ["user_id"] });
 
         if (profileError) {
           console.error("Profile save error:", profileError);

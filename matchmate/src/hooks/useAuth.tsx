@@ -36,12 +36,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, username: string) => {
     try {
-      // First, create the user account
-      const { error: signUpError, data } = await supabase.auth.signUp({
+      // Create the user account (email confirmation disabled in Supabase Auth settings)
+      const { error: signUpError, data: signUpData } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/email-verification`,
           data: { username },
         },
       });
@@ -50,18 +49,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: signUpError as Error };
       }
 
-      // In development or if email confirmation fails, auto-login
-      if (import.meta.env.DEV || data?.user?.email_confirmed_at === null) {
-        // Try to sign in immediately
-        const { error: signInError } = await supabase.auth.signInWithPassword({ 
-          email, 
-          password 
-        });
-        
-        if (signInError) {
-          console.warn("Auto-login failed, waiting for email verification:", signInError);
-        }
+      // Immediately sign in after signup to establish session
+      const { error: signInError } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
+      
+      if (signInError) {
+        console.error("Auto-login after signup failed:", signInError);
+        // Return helpful error message
+        return { error: new Error("Impossible de créer le compte. Vérifiez que 'Email Confirmations' est désactivées dans Supabase Auth Settings.") };
       }
+
+      console.log("✅ User signed up and logged in:", email);
 
       return { error: null };
     } catch (err) {
